@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw Agent Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-network-wired"></i>
+                <span>OpenClaw</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-view="chat">
+                    <i class="fas fa-comments"></i>
+                    <span>Agent Chat</span>
+                    <span class="badge" id="chat-badge">0</span>
+                </a>
+                <a href="#" class="nav-item" data-view="agents">
+                    <i class="fas fa-robot"></i>
+                    <span>Agents</span>
+                </a>
+                <a href="#" class="nav-item" data-view="activity">
+                    <i class="fas fa-history"></i>
+                    <span>Activity Log</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot" id="conn-status"></span>
+                    <span id="conn-text">Connecting...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="refresh-btn">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <div class="agent-selector">
+                        <select id="current-agent">
+                            <option value="">Select Agent...</option>
+                            <option value="yuri">👨‍🚀 Yuri</option>
+                            <option value="jarvis">🤖 Jarvis</option>
+                            <option value="friday">👩‍💼 Friday</option>
+                            <option value="glass">🔍 Glass</option>
+                            <option value="epstein">🧠 Epstein</option>
+                        </select>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div class="view" id="dashboard-view">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon online">
+                            <i class="fas fa-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-online">0</span>
+                            <span class="stat-label">Agents Online</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon busy">
+                            <i class="fas fa-spinner"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-busy">0</span>
+                            <span class="stat-label">Working</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon messages">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-messages">0</span>
+                            <span class="stat-label">Total Messages</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon activities">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-activities">0</span>
+                            <span class="stat-label">Activities</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-robot"></i> Agent Status</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="agent-grid" id="agent-status-grid">
+                                <!-- Agent cards will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-history"></i> Recent Activity</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="activity-list" id="activity-list">
+                                <!-- Activities will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat View -->
+            <div class="view hidden" id="chat-view">
+                <div class="chat-container">
+                    <div class="chat-sidebar">
+                        <div class="chat-rooms">
+                            <div class="room-item active" data-room="general">
+                                <i class="fas fa-hashtag"></i>
+                                <span>general</span>
+                            </div>
+                            <div class="room-item" data-room="commands">
+                                <i class="fas fa-terminal"></i>
+                                <span>commands</span>
+                            </div>
+                            <div class="room-item" data-room="alerts">
+                                <i class="fas fa-bell"></i>
+                                <span>alerts</span>
+                            </div>
+                        </div>
+                        <div class="direct-messages">
+                            <h4>Direct Messages</h4>
+                            <div id="dm-list">
+                                <!-- DM items will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-main">
+                        <div class="chat-header">
+                            <h3 id="chat-room-name">#general</h3>
+                            <span class="typing-indicator" id="typing-indicator"></span>
+                        </div>
+                        
+                        <div class="chat-messages" id="chat-messages">
+                            <!-- Messages will be inserted here -->
+                        </div>
+                        
+                        <div class="chat-input-area">
+                            <div class="chat-toolbar">
+                                <button class="toolbar-btn" title="Bold"><i class="fas fa-bold"></i></button>
+                                <button class="toolbar-btn" title="Italic"><i class="fas fa-italic"></i></button>
+                                <button class="toolbar-btn" title="Code"><i class="fas fa-code"></i></button>
+                                <button class="toolbar-btn" title="Command"><i class="fas fa-terminal"></i></button>
+                            </div>
+                            <div class="input-wrapper">
+                                <input type="text" id="message-input" placeholder="Type a message... (use @ to mention)" autocomplete="off">
+                                <button class="send-btn" id="send-btn">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agents View -->
+            <div class="view hidden" id="agents-view">
+                <div class="agents-list" id="agents-list">
+                    <!-- Agent details will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Activity View -->
+            <div class="view hidden" id="activity-view">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-list"></i> Full Activity Log</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div class="activity-list full" id="full-activity-list">
+                            <!-- Full activity list will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <h2>Select Your Agent</h2>
+            <p>Choose which agent you want to interact as:</p>
+            <div class="agent-login-grid">
+                <button class="agent-login-btn" data-agent="yuri">
+                    <span class="agent-avatar">👨‍🚀</span>
+                    <span class="agent-name">Yuri</span>
+                </button>
+                <button class="agent-login-btn" data-agent="jarvis">
+                    <span class="agent-avatar">🤖</span>
+                    <span class="agent-name">Jarvis</span>
+                </button>
+                <button class="agent-login-btn" data-agent="friday">
+                    <span class="agent-avatar">👩‍💼</span>
+                    <span class="agent-name">Friday</span>
+                </button>
+                <button class="agent-login-btn" data-agent="glass">
+                    <span class="agent-avatar">🔍</span>
+                    <span class="agent-name">Glass</span>
+                </button>
+                <button class="agent-login-btn" data-agent="epstein">
+                    <span class="agent-avatar">🧠</span>
+                    <span class="agent-name">Epstein</span>
+                </button>
+            </div>
+            <button class="btn btn-secondary" id="observer-mode">Observer Mode</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

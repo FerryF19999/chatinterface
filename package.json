@@ -1,0 +1,21 @@
+{
+  "name": "openclaw-agent-dashboard",
+  "version": "1.0.0",
+  "description": "Real-time dashboard and chat interface for OpenClaw agents",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["openclaw", "agents", "dashboard", "chat"],
+  "author": "OpenClaw Team",
+  "license": "MIT"
+}
