@@ -984,3 +984,389 @@ select {
         display: none;
     }
 }
+/* ========================================
+   OWNER FEATURES & REAL-TIME STYLES
+   ======================================== */
+
+/* Owner Indicator in Sidebar */
+.owner-indicator {
+    font-size: 1rem;
+    margin-left: auto;
+    cursor: help;
+}
+
+/* Owner Section in Sidebar */
+.sidebar-section {
+    margin-top: auto;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.sidebar-section h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.owner-section {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin: 1rem 0;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.btn-owner {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #1a1a1a;
+    font-weight: 600;
+    width: 100%;
+    padding: 0.75rem;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-owner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+/* Owner Status in Footer */
+.owner-status {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.owner-badge-sidebar {
+    font-size: 0.7rem;
+    color: #FFD700;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Owner Welcome Banner */
+.owner-welcome-banner {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 165, 0, 0.1) 100%);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.owner-avatar-large {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.owner-welcome-text {
+    flex: 1;
+}
+
+.owner-welcome-text h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.owner-welcome-text p {
+    color: var(--text-secondary);
+    max-width: 600px;
+}
+
+.owner-quick-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Owner Panel Header */
+.owner-panel .panel-header {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
+}
+
+.owner-tag-header {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #1a1a1a;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    margin-left: auto;
+}
+
+/* Owner Call Modal */
+.owner-call-content {
+    max-width: 500px;
+}
+
+.owner-call-content .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.owner-call-content .modal-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #FFD700;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-desc {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.owner-call-agents {
+    margin-bottom: 1.5rem;
+}
+
+.owner-call-agents h4 {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.owner-call-agent-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+}
+
+.owner-call-agent-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 0.5rem;
+    background: var(--bg-tertiary);
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.owner-call-agent-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.owner-call-agent-btn .agent-avatar {
+    font-size: 1.5rem;
+}
+
+.owner-call-agent-btn .agent-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.owner-call-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.owner-call-input-area label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.owner-call-input-area input {
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.owner-call-input-area input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-full {
+    width: 100%;
+    padding: 0.875rem;
+    font-size: 1rem;
+}
+
+/* Owner Message Styles */
+.owner-message {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
+    border-left: 3px solid #FFD700;
+}
+
+.owner-message .message-avatar {
+    position: relative;
+}
+
+.role-badge {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: #FFD700;
+    color: #1a1a1a;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+}
+
+.owner-tag {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #1a1a1a;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+}
+
+/* Owner Call Message */
+.owner-call-message {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border-left: 3px solid var(--primary);
+}
+
+.call-badge {
+    background: var(--primary);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+}
+
+.call-text {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+/* Agent Response Message */
+.agent-response-message {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+    border-left: 3px solid var(--success);
+}
+
+.response-badge {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: var(--success);
+    font-size: 0.6rem;
+    padding: 0.1rem 0.2rem;
+    border-radius: 50%;
+}
+
+.response-tag {
+    background: var(--success);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+}
+
+.response-text {
+    font-weight: 500;
+}
+
+/* Activity Item Owner Call */
+.activity-item.owner-call {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+    border-left: 2px solid #FFD700;
+}
+
+.owner-badge {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #1a1a1a;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+}
+
+/* Agent Actions */
+.agent-actions {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* Real-time Connection Status */
+.status-dot.realtime {
+    background: #00ff88;
+    box-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88;
+    animation: pulse-realtime 2s infinite;
+}
+
+@keyframes pulse-realtime {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.1);
+    }
+}
+
+/* Small Button Variant */
+.btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+/* Hidden utility */
+.hidden {
+    display: none !important;
+}

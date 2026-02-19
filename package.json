@@ -1,7 +1,7 @@
 {
   "name": "openclaw-agent-dashboard",
-  "version": "1.0.0",
-  "description": "Real-time dashboard and chat interface for OpenClaw agents",
+  "version": "1.1.0",
+  "description": "Real-time dashboard and chat interface for OpenClaw agents with Pusher",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,13 +10,14 @@
   },
   "dependencies": {
     "express": "^4.18.2",
+    "pusher": "^5.2.0",
     "socket.io": "^4.7.2",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": ["openclaw", "agents", "dashboard", "chat"],
+  "keywords": ["openclaw", "agents", "dashboard", "chat", "real-time", "pusher"],
   "author": "OpenClaw Team",
   "license": "MIT"
 }

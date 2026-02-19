@@ -1,4 +1,6 @@
-// OpenClaw Agent Dashboard - Frontend App (Vercel Serverless Compatible)
+// OpenClaw Agent Dashboard - Frontend App with Pusher Real-time
+// Ferry is the Owner with full agent control
+
 class AgentDashboard {
     constructor() {
         this.apiUrl = '/api';
@@ -10,24 +12,180 @@ class AgentDashboard {
         this.activities = [];
         this.unreadCount = 0;
         this.typingTimeout = null;
-        this.pollingInterval = null;
         this.lastMessageId = null;
         this.lastActivityId = null;
-        this.userId = 'ferry'; // Current user is Ferry
+        
+        // Ferry as Owner
+        this.userId = 'ferry';
         this.userProfile = {
             id: 'ferry',
             name: 'Ferry',
             avatar: '👤',
-            color: '#FFD700'
+            color: '#FFD700',
+            role: 'owner',
+            roleLabel: 'Owner',
+            canManageAgents: true,
+            canCallAgents: true
         };
+        
+        // Pusher for real-time
+        this.pusher = null;
+        this.channel = null;
         
         this.init();
     }
     
-    init() {
+    async init() {
         this.bindEvents();
-        this.loadInitialData();
-        this.startPolling();
+        await this.loadInitialData();
+        this.initPusher();
+        this.checkLoginStatus();
+    }
+    
+    // Initialize Pusher for real-time updates
+    initPusher() {
+        // Get Pusher config from init data or use defaults
+        const pusherKey = window.PUSHER_KEY || 'your-key';
+        const pusherCluster = window.PUSHER_CLUSTER || 'ap1';
+        
+        if (typeof Pusher === 'undefined') {
+            console.warn('Pusher not loaded, falling back to polling');
+            this.startPolling();
+            return;
+        }
+        
+        this.pusher = new Pusher(pusherKey, {
+            cluster: pusherCluster,
+            encrypted: true
+        });
+        
+        this.channel = this.pusher.subscribe('dashboard');
+        
+        // Bind to real-time events
+        this.channel.bind('chat:message', (message) => {
+            this.handleRealtimeMessage(message);
+        });
+        
+        this.channel.bind('activity:new', (activity) => {
+            this.handleRealtimeActivity(activity);
+        });
+        
+        this.channel.bind('agent:updated', (agent) => {
+            this.handleRealtimeAgentUpdate(agent);
+        });
+        
+        this.channel.bind('chat:read', (messageId) => {
+            this.handleRealtimeRead(messageId);
+        });
+        
+        console.log('✅ Real-time connected via Pusher');
+        this.updateConnectionStatus(true, 'realtime');
+    }
+    
+    // Fallback polling (kept for compatibility)
+    startPolling() {
+        console.log('Starting polling fallback...');
+        setInterval(() => this.pollForUpdates(), 2000);
+    }
+    
+    async pollForUpdates() {
+        try {
+            // Only poll if not using real-time
+            if (this.pusher && this.pusher.connection.state === 'connected') {
+                return;
+            }
+            
+            const agents = await this.apiGet('/agents');
+            const agentsChanged = JSON.stringify(agents) !== JSON.stringify(Object.values(this.agents));
+            if (agentsChanged) {
+                this.agents = agents.reduce((acc, agent) => {
+                    acc[agent.id] = agent;
+                    return acc;
+                }, {});
+                this.renderAgents();
+                this.renderStats();
+                this.renderDMList();
+            }
+            
+            const messages = await this.apiGet('/messages?limit=50');
+            if (messages.length > this.messages.length) {
+                const newMessages = messages.slice(this.messages.length);
+                newMessages.forEach(msg => {
+                    this.messages.push(msg);
+                    this.appendMessage(msg);
+                    if (msg.fromAgentId !== this.currentAgent) {
+                        this.unreadCount++;
+                    }
+                });
+                this.updateBadge();
+            }
+            
+            const activities = await this.apiGet('/activities?limit=20');
+            if (activities.length > 0 && activities[0].id !== this.lastActivityId) {
+                this.activities = activities;
+                this.renderActivity();
+                this.lastActivityId = activities[0].id;
+            }
+            
+            this.updateConnectionStatus(true, 'polling');
+        } catch (error) {
+            console.error('Polling error:', error);
+            this.updateConnectionStatus(false);
+        }
+    }
+    
+    // Real-time event handlers
+    handleRealtimeMessage(message) {
+        // Check if message already exists
+        if (this.messages.find(m => m.id === message.id)) {
+            return;
+        }
+        
+        this.messages.push(message);
+        this.appendMessage(message);
+        
+        if (message.fromAgentId !== this.currentAgent && message.fromAgentId !== this.userId) {
+            this.unreadCount++;
+            this.updateBadge();
+        }
+        
+        // Play notification sound if enabled
+        this.playNotificationSound(message);
+    }
+    
+    handleRealtimeActivity(activity) {
+        // Check if activity already exists
+        if (this.activities.find(a => a.id === activity.id)) {
+            return;
+        }
+        
+        this.activities.unshift(activity);
+        if (this.activities.length > 100) {
+            this.activities.pop();
+        }
+        
+        this.prependActivity(activity);
+        this.renderStats();
+    }
+    
+    handleRealtimeAgentUpdate(agent) {
+        this.agents[agent.id] = agent;
+        this.renderAgents();
+        this.renderStats();
+        this.renderDMList();
+    }
+    
+    handleRealtimeRead(messageId) {
+        const msg = this.messages.find(m => m.id === messageId);
+        if (msg) {
+            msg.read = true;
+        }
+    }
+    
+    playNotificationSound(message) {
+        // Optional: Add sound notification
+        // const audio = new Audio('/notification.mp3');
+        // audio.play().catch(() => {});
     }
     
     // API Helpers
@@ -60,6 +218,13 @@ class AgentDashboard {
     async loadInitialData() {
         try {
             const data = await this.apiGet('/init');
+            
+            // Store Pusher config
+            if (data.pusherKey) {
+                window.PUSHER_KEY = data.pusherKey;
+                window.PUSHER_CLUSTER = data.pusherCluster;
+            }
+            
             this.agents = data.agents.reduce((acc, agent) => {
                 acc[agent.id] = agent;
                 return acc;
@@ -69,19 +234,19 @@ class AgentDashboard {
             if (data.users) {
                 this.users = data.users;
                 if (data.users.ferry) {
-                    this.userProfile = data.users.ferry;
+                    this.userProfile = { ...this.userProfile, ...data.users.ferry };
                 }
             }
             
             this.messages = data.messages;
             this.activities = data.activities;
             
-            // Track last IDs for polling
+            // Track last IDs
             if (this.messages.length > 0) {
                 this.lastMessageId = this.messages[this.messages.length - 1].id;
             }
             if (this.activities.length > 0) {
-                this.lastActivityId = this.activities[0].id;
+                this.lastActivityId = activities[0].id;
             }
             
             this.renderAgents();
@@ -90,58 +255,8 @@ class AgentDashboard {
             this.renderMessages();
             this.renderDMList();
             this.updateConnectionStatus(true);
-            this.checkLoginStatus();
         } catch (error) {
             console.error('Failed to load initial data:', error);
-            this.updateConnectionStatus(false);
-        }
-    }
-    
-    startPolling() {
-        // Poll for updates every 2 seconds
-        this.pollingInterval = setInterval(() => this.pollForUpdates(), 2000);
-    }
-    
-    async pollForUpdates() {
-        try {
-            // Poll agents
-            const agents = await this.apiGet('/agents');
-            const agentsChanged = JSON.stringify(agents) !== JSON.stringify(Object.values(this.agents));
-            if (agentsChanged) {
-                this.agents = agents.reduce((acc, agent) => {
-                    acc[agent.id] = agent;
-                    return acc;
-                }, {});
-                this.renderAgents();
-                this.renderStats();
-                this.renderDMList();
-            }
-            
-            // Poll messages
-            const messages = await this.apiGet('/messages?limit=50');
-            if (messages.length > this.messages.length) {
-                const newMessages = messages.slice(this.messages.length);
-                newMessages.forEach(msg => {
-                    this.messages.push(msg);
-                    this.appendMessage(msg);
-                    if (msg.fromAgentId !== this.currentAgent) {
-                        this.unreadCount++;
-                    }
-                });
-                this.updateBadge();
-            }
-            
-            // Poll activities
-            const activities = await this.apiGet('/activities?limit=20');
-            if (activities.length > 0 && activities[0].id !== this.lastActivityId) {
-                this.activities = activities;
-                this.renderActivity();
-                this.lastActivityId = activities[0].id;
-            }
-            
-            this.updateConnectionStatus(true);
-        } catch (error) {
-            console.error('Polling error:', error);
             this.updateConnectionStatus(false);
         }
     }
@@ -230,17 +345,47 @@ class AgentDashboard {
             });
         });
         
+        // Owner Call Agent button
+        document.getElementById('owner-call-btn')?.addEventListener('click', () => {
+            this.toggleOwnerCallModal();
+        });
+        
+        // Close owner call modal
+        document.getElementById('close-owner-call')?.addEventListener('click', () => {
+            this.hideOwnerCallModal();
+        });
+        
+        // Owner call agent selection
+        document.querySelectorAll('.owner-call-agent-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const agentId = btn.dataset.agent;
+                document.getElementById('owner-call-target').value = agentId;
+                document.getElementById('owner-call-input').focus();
+            });
+        });
+        
+        // Send owner call
+        document.getElementById('send-owner-call')?.addEventListener('click', () => {
+            this.sendOwnerCall();
+        });
+        
+        document.getElementById('owner-call-input')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.sendOwnerCall();
+            }
+        });
+        
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById('agent-cmd-dropdown');
             const btn = document.getElementById('agent-cmd-btn');
-            if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            if (!dropdown?.contains(e.target) && !btn?.contains(e.target)) {
                 this.hideAgentDropdown();
             }
         });
         
         // DM item click - open direct message
-        document.getElementById('dm-list').addEventListener('click', (e) => {
+        document.getElementById('dm-list')?.addEventListener('click', (e) => {
             const dmItem = e.target.closest('.dm-item');
             if (dmItem) {
                 const agentId = dmItem.dataset.agent;
@@ -249,12 +394,65 @@ class AgentDashboard {
         });
     }
     
+    // Owner Call Agent Feature - Ferry calls agents directly
+    toggleOwnerCallModal() {
+        const modal = document.getElementById('owner-call-modal');
+        if (modal) {
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                document.getElementById('owner-call-input')?.focus();
+            }
+        }
+    }
+    
+    hideOwnerCallModal() {
+        const modal = document.getElementById('owner-call-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+    
+    async sendOwnerCall() {
+        const agentId = document.getElementById('owner-call-target')?.value;
+        const command = document.getElementById('owner-call-input')?.value?.trim();
+        
+        if (!agentId) {
+            this.addSystemMessage('❌ Please select an agent to call');
+            return;
+        }
+        if (!command) {
+            this.addSystemMessage('❌ Please enter a command');
+            return;
+        }
+        
+        try {
+            // Show calling message
+            this.addSystemMessage(`📞 Calling ${this.agents[agentId]?.name || agentId}...`);
+            
+            const response = await this.apiPost('/owner/call-agent', {
+                agentId: agentId,
+                command: command,
+                params: command,
+                ownerId: this.userId
+            });
+            
+            if (response.success) {
+                document.getElementById('owner-call-input').value = '';
+                this.hideOwnerCallModal();
+                
+                // Switch to chat view to see response
+                this.switchView('chat');
+            }
+        } catch (error) {
+            console.error('Owner call failed:', error);
+            this.addSystemMessage(`❌ Failed to call agent: ${error.message}`);
+        }
+    }
+    
     toggleAgentDropdown() {
         const dropdown = document.getElementById('agent-cmd-dropdown');
-        if (dropdown.style.display === 'none') {
-            dropdown.style.display = 'block';
-        } else {
-            dropdown.style.display = 'none';
+        if (dropdown) {
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
         }
     }
     
@@ -293,11 +491,11 @@ class AgentDashboard {
     }
     
     showLoginModal() {
-        document.getElementById('login-modal').classList.remove('hidden');
+        document.getElementById('login-modal')?.classList.remove('hidden');
     }
     
     closeLoginModal() {
-        document.getElementById('login-modal').classList.add('hidden');
+        document.getElementById('login-modal')?.classList.add('hidden');
     }
     
     async loginAs(agentId) {
@@ -331,7 +529,7 @@ class AgentDashboard {
     
     switchView(view) {
         document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-        document.getElementById(`${view}-view`).classList.remove('hidden');
+        document.getElementById(`${view}-view`)?.classList.remove('hidden');
         
         document.getElementById('page-title').textContent = 
             view === 'dashboard' ? 'Dashboard' :
@@ -397,10 +595,23 @@ class AgentDashboard {
                                 <div class="agent-meta-value">${agent.id}</div>
                             </div>
                         </div>
+                        ${this.userProfile.role === 'owner' ? `
+                            <div class="agent-actions">
+                                <button class="btn btn-primary btn-sm" onclick="window.dashboard.callAgentDirect('${agent.id}')">
+                                    <i class="fas fa-phone"></i> Call Agent
+                                </button>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
         }
+    }
+    
+    // Direct call from agent card
+    callAgentDirect(agentId) {
+        document.getElementById('owner-call-target').value = agentId;
+        this.toggleOwnerCallModal();
     }
     
     renderStats() {
@@ -440,15 +651,19 @@ class AgentDashboard {
     }
     
     createActivityHTML(activity) {
-        const agent = this.agents[activity.agentId];
+        const agent = this.agents[activity.agentId] || this.users[activity.agentId];
+        const isOwnerCall = activity.metadata?.commandType === 'owner-call';
+        
         return `
-            <div class="activity-item">
+            <div class="activity-item ${isOwnerCall ? 'owner-call' : ''}">
                 <div class="activity-icon ${activity.type}">
                     <i class="fas fa-${this.getActivityIcon(activity.type)}"></i>
                 </div>
                 <div class="activity-content">
                     <div class="activity-text">
-                        <strong style="color: ${agent?.color || 'inherit'}">${agent?.name || activity.agentId}</strong> ${activity.description}
+                        <strong style="color: ${agent?.color || 'inherit'}">${agent?.name || activity.agentId}</strong> 
+                        ${isOwnerCall ? '<span class="owner-badge">📞 OWNER CALL</span>' : ''}
+                        ${activity.description}
                     </div>
                     <div class="activity-time">${this.formatTime(activity.timestamp)}</div>
                 </div>
@@ -502,17 +717,29 @@ class AgentDashboard {
     }
     
     createMessageHTML(message) {
-        // Handle messages from user (Ferry)
+        // Handle owner calls specially
+        if (message.messageType === 'owner-call') {
+            return this.createOwnerCallMessageHTML(message);
+        }
+        if (message.messageType === 'agent-response') {
+            return this.createAgentResponseMessageHTML(message);
+        }
+        
+        // Handle messages from owner (Ferry)
         if (message.fromAgentId === this.userId || message.fromAgentId === 'ferry') {
             const isOwn = true;
             return `
-                <div class="message ${isOwn ? 'own' : ''} user-message">
+                <div class="message ${isOwn ? 'own' : ''} user-message owner-message">
                     <div class="message-avatar" style="background: ${this.userProfile.color}20; border: 2px solid ${this.userProfile.color}">
                         ${this.userProfile.avatar}
+                        <span class="role-badge">${this.userProfile.roleLabel}</span>
                     </div>
                     <div class="message-content">
                         <div class="message-header">
-                            <span class="message-author" style="color: ${this.userProfile.color}">${this.userProfile.name}</span>
+                            <span class="message-author" style="color: ${this.userProfile.color}">
+                                ${this.userProfile.name}
+                                <span class="owner-tag">👑 Owner</span>
+                            </span>
                             <span class="message-time">${this.formatTime(message.timestamp)}</span>
                         </div>
                         <div class="message-text">${this.escapeHtml(message.content)}</div>
@@ -535,6 +762,48 @@ class AgentDashboard {
                         <span class="message-time">${this.formatTime(message.timestamp)}</span>
                     </div>
                     <div class="message-text">${this.escapeHtml(message.content)}</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    createOwnerCallMessageHTML(message) {
+        return `
+            <div class="message owner-call-message">
+                <div class="message-avatar" style="background: ${this.userProfile.color}20; border: 2px solid ${this.userProfile.color}">
+                    📞
+                </div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author" style="color: ${this.userProfile.color}">
+                            ${this.userProfile.name} 
+                            <span class="call-badge">📞 CALLED AGENT</span>
+                        </span>
+                        <span class="message-time">${this.formatTime(message.timestamp)}</span>
+                    </div>
+                    <div class="message-text call-text">${this.escapeHtml(message.content)}</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    createAgentResponseMessageHTML(message) {
+        const fromAgent = this.agents[message.fromAgentId];
+        return `
+            <div class="message agent-response-message">
+                <div class="message-avatar" style="background: ${fromAgent?.color || '#666'}20; border: 2px solid ${fromAgent?.color || '#666'}">
+                    ${fromAgent?.avatar || '👤'}
+                    <span class="response-badge">📞</span>
+                </div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author" style="color: ${fromAgent?.color || 'inherit'}">
+                            ${fromAgent?.name || message.fromAgentId}
+                            <span class="response-tag">Response to Owner</span>
+                        </span>
+                        <span class="message-time">${this.formatTime(message.timestamp)}</span>
+                    </div>
+                    <div class="message-text response-text">${this.escapeHtml(message.content)}</div>
                 </div>
             </div>
         `;
@@ -657,7 +926,7 @@ class AgentDashboard {
                 messageType: 'direct'
             });
             
-            this.messages.push(message);
+            this.messages            this.messages.push(message);
             this.appendMessage(message);
         } catch (error) {
             console.error('Failed to send DM:', error);
@@ -703,15 +972,20 @@ class AgentDashboard {
     }
     
     // Helpers
-    updateConnectionStatus(connected) {
+    updateConnectionStatus(connected, type = 'polling') {
         const dot = document.getElementById('conn-status');
         const text = document.getElementById('conn-text');
         
         if (connected) {
             dot.classList.add('connected');
-            text.textContent = 'Connected';
+            if (type === 'realtime') {
+                dot.classList.add('realtime');
+                text.textContent = '⚡ Real-time';
+            } else {
+                text.textContent = 'Connected';
+            }
         } else {
-            dot.classList.remove('connected');
+            dot.classList.remove('connected', 'realtime');
             text.textContent = 'Disconnected';
         }
     }

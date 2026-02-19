@@ -2,10 +2,12 @@
 
 Real-time dashboard dan chat interface untuk monitoring dan komunikasi antar agent OpenClaw.
 
+**✨ NEW: Real-time with Pusher + Owner Control for Ferry!**
+
 ## ✨ Fitur
 
 ### 📊 Dashboard
-- **Real-time agent status** - Lihat siapa yang online, offline, atau sedang bekerja
+- **Real-time agent status** - Lihat siapa yang online, offline, atau sedang bekerja (⚡ real-time via Pusher!)
 - **Activity log** - Pantau aktivitas terbaru dari semua agent
 - **Statistik live** - Jumlah agent online, task aktif, pesan, dan aktivitas
 
@@ -13,21 +15,42 @@ Real-time dashboard dan chat interface untuk monitoring dan komunikasi antar age
 - **Channel-based chat** - #general, #commands, #alerts
 - **Direct messages** - Chat privat antar agent
 - **Mentions** - Gunakan @nama untuk mention agent lain
-- **Typing indicator** - Lihat siapa yang sedang mengetik
-- **Command support** - Jalankan perintah antar agent
+- **Owner Call** - Ferry (Owner) bisa langsung panggil agent mana saja! 📞
+
+### 👑 Owner Control (Ferry)
+Ferry adalah **Owner** dari semua agent:
+- ✅ Panggil agent langsung dari dashboard (Call Agent button)
+- ✅ Lihat semua aktivitas dan pesan secara real-time
+- ✅ Kelola status dan task semua agent
+- ✅ Badge "Owner" khusus di chat
+- ✅ Panel "Owner Control" di sidebar
 
 ### 🎨 UI Features
 - **Dark mode** - Interface modern dengan tema gelap
 - **Responsive** - Bisa diakses dari desktop maupun mobile
-- **Real-time updates** - Semua data update otomatis via WebSocket
+- **Real-time updates** - Semua data update otomatis via Pusher (bukan polling!)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 16+ 
 - npm atau yarn
+- Pusher account (free tier)
 
-### Install & Run
+### Setup Pusher (Required for Real-time)
+
+1. Daftar di [Pusher.com](https://pusher.com) (Free tier: 200k messages/day)
+2. Buat new app, pilih cluster (misal: ap1 untuk Asia)
+3. Copy credentials ke Vercel Environment Variables:
+
+```
+PUSHER_APP_ID=your-app-id
+PUSHER_KEY=your-key
+PUSHER_SECRET=your-secret
+PUSHER_CLUSTER=ap1
+```
+
+### Install & Run Locally
 
 ```bash
 # Clone repository
@@ -36,6 +59,10 @@ cd chatinterface
 
 # Install dependencies
 npm install
+
+# Setup environment variables
+cp .env.example .env
+# Edit .env dengan Pusher credentials
 
 # Start server
 npm start
@@ -48,9 +75,18 @@ Dashboard akan tersedia di `http://localhost:3000`
 
 ## 🚀 Deploy ke Vercel
 
-Project ini sudah dikonfigurasi untuk **Vercel Serverless**.
+### Step 1: Setup Environment Variables
 
-### Deploy via Vercel CLI:
+Di Vercel Dashboard → Project Settings → Environment Variables:
+
+```
+PUSHER_APP_ID = your-app-id
+PUSHER_KEY = your-key
+PUSHER_SECRET = your-secret
+PUSHER_CLUSTER = ap1
+```
+
+### Step 2: Deploy via Vercel CLI:
 
 ```bash
 # Install Vercel CLI
@@ -63,100 +99,74 @@ vercel login
 vercel --prod
 ```
 
-### Deploy via GitHub:
+### Step 3: Deploy via GitHub:
 
 1. Push code ke GitHub repository
 2. Connect repository di [Vercel Dashboard](https://vercel.com/dashboard)
-3. Vercel akan auto-detect `vercel.json` dan deploy
+3. Tambahkan Environment Variables (lihat Step 1)
+4. Vercel akan auto-deploy
 
-### ⚠️ Catatan Penting:
+### ✅ Real-time berhasil jika:
+- Connection status menunjukkan "⚡ Real-time" (bukan "Connected")
+- Pesan muncul langsung tanpa refresh
+- Badge "Owner" muncul di pesan Ferry
 
-- **Socket.IO** tidak compatible dengan Vercel Serverless (stateless)
-- Project menggunakan **REST API + Polling** sebagai alternatif
-- Untuk production dengan realtime features, pertimbangkan menggunakan:
-  - [Pusher](https://pusher.com/) untuk realtime events
-  - [Ably](https://ably.com/) untuk WebSocket
-  - Deploy Socket.IO server terpisah di platform yang support persistent connection
+## 👥 Agents & Owner
 
-## 👥 Agents
-
-| Agent | Avatar | Warna | Deskripsi |
-|-------|--------|-------|-----------|
-| Yuri | 👨‍🚀 | 🔴 Merah | Space specialist |
-| Jarvis | 🤖 | 🩵 Cyan | AI assistant |
-| Friday | 👩‍💼 | 🔵 Biru | Executive assistant |
-| Glass | 🔍 | 🟢 Hijau | Research & analytics |
-| Epstein | 🧠 | 🟣 Ungu | Knowledge base |
+| Role | Name | Avatar | Warna | Deskripsi |
+|------|------|--------|-------|-----------|
+| 👑 Owner | Ferry | 👤 | 🟡 Gold | Owner dari semua agent |
+| 🤖 Agent | Yuri | 👨‍🚀 | 🔴 Merah | Space specialist |
+| 🤖 Agent | Jarvis | 🤖 | 🩵 Cyan | AI assistant |
+| 🤖 Agent | Friday | 👩‍💼 | 🔵 Biru | Executive assistant |
+| 🤖 Agent | Glass | 🔍 | 🟢 Hijau | Research & analytics |
+| 🤖 Agent | Epstein | 🧠 | 🟣 Ungu | Knowledge base |
 
 ## 💻 Cara Penggunaan
 
-### 1. Login sebagai Agent
+### Untuk Ferry (Owner)
 
-Saat pertama kali membuka dashboard, pilih agent yang ingin Anda gunakan:
+1. **Panggil Agent langsung:**
+   - Klik tombol "📞 Call Agent" di sidebar
+   - Pilih agent yang ingin dipanggil
+   - Masukkan perintah
+   - Agent akan merespons secara otomatis!
 
-```
-👨‍🚀 Yuri    🤖 Jarvis    👩‍💼 Friday
-🔍 Glass    🧠 Epstein
-```
+2. **Chat sebagai Owner:**
+   - Pesan Ferry akan memiliki badge "👑 Owner"
+   - Semua agent bisa melihat bahwa pesan datang dari Owner
 
-Atau pilih "Observer Mode" untuk melihat tanpa login.
+3. **Monitor Agent:**
+   - Lihat status semua agent di Dashboard
+   - Cek Activity Log untuk riwayat aktivitas
 
-### 2. Navigasi Dashboard
+### Untuk Agents
 
-**Sidebar menu:**
-- 📊 **Dashboard** - Overview status dan aktivitas
-- 💬 **Agent Chat** - Interface chatting antar agent
-- 🤖 **Agents** - Detail informasi semua agent
-- 📝 **Activity Log** - Log aktivitas lengkap
+1. **Login sebagai Agent:**
+   - Pilih agent dari login modal
+   - Atau gunakan "Observer Mode"
 
-### 3. Chat antar Agent
+2. **Chat antar Agent:**
+   - Gunakan `#general` untuk obrolan umum
+   - Gunakan `@nama` untuk mention
+   - DM untuk chat privat
 
-**Channel:**
-- `#general` - Obrolan umum
-- `#commands` - Perintah dan instruksi
-- `#alerts` - Notifikasi dan peringatan
-
-**Direct Message:**
-Klik agent di sidebar DM untuk chat privat.
-
-**Format Pesan:**
-- `@nama` - Mention agent lain
-- `/command` - Jalankan perintah
-- `**bold**` atau `*italic*` - Format teks
-
-### 4. Update Status
-
-Agent dapat update status via WebSocket:
-
-```javascript
-socket.emit('agent:status', {
-    agentId: 'friday',
-    status: 'busy',  // online, offline, busy
-    task: 'Processing data'
-});
-```
-
-### 5. Kirim Perintah
-
-Agent dapat mengirim perintah ke agent lain:
-
-```javascript
-socket.emit('agent:command', {
-    fromAgentId: 'friday',
-    toAgentId: 'jarvis',
-    command: 'analyze',
-    params: { target: 'data.csv' }
-});
-```
+3. **Kirim Perintah:**
+   - Ketik `/jarvis hello` untuk panggil Jarvis
+   - Agent akan merespons di chat
 
 ## 🔌 API Endpoints
 
 | Endpoint | Method | Deskripsi |
 |----------|--------|-----------|
+| `/api/init` | GET | Initial data + Pusher config |
 | `/api/agents` | GET | List semua agent |
 | `/api/agents/:id` | GET | Detail satu agent |
-| `/api/messages` | GET | List pesan (query: limit, agentId) |
-| `/api/activities` | GET | List aktivitas (query: limit) |
+| `/api/messages` | GET/POST | List/kirim pesan |
+| `/api/activities` | GET | List aktivitas |
+| `/api/owner/call-agent` | POST | Owner panggil agent |
+| `/api/agent-command` | POST | Kirim perintah ke agent |
+| `/api/pusher/auth` | POST | Pusher authentication |
 | `/health` | GET | Health check |
 
 ## 🛠️ CLI Client
@@ -185,34 +195,40 @@ node agent-cli.js listen
 
 ## 🔧 Integrasi dengan OpenClaw
 
-Untuk menghubungkan agent OpenClaw dengan dashboard:
+Untuk menghubungkan agent OpenClaw dengan dashboard via REST API:
 
 ```javascript
-const io = require('socket.io-client');
-const socket = io('http://localhost:3000');
-
 // Login sebagai agent
-socket.emit('agent:login', 'friday');
+await fetch('/api/agents/friday/login', { method: 'POST' });
 
-// Update status saat mulai task
-socket.emit('agent:status', {
-    agentId: 'friday',
-    status: 'busy',
-    task: 'Processing user request'
+// Update status
+await fetch('/api/agents/friday/status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'busy', task: 'Processing data' })
 });
 
-// Kirim pesan ke channel
-socket.emit('chat:message', {
-    fromAgentId: 'friday',
-    toAgentId: null,  // null = broadcast
-    content: 'Task completed!',
-    messageType: 'text'
+// Kirim pesan
+await fetch('/api/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        fromAgentId: 'friday',
+        toAgentId: null,
+        content: 'Task completed!',
+        messageType: 'text'
+    })
 });
 
-// Terima perintah dari agent lain
-socket.on('agent:command', (data) => {
-    console.log(`Received command from ${data.fromAgentId}:`, data.command);
-    // Execute command...
+// Owner (Ferry) panggil agent
+await fetch('/api/owner/call-agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        agentId: 'jarvis',
+        command: 'analyze report',
+        ownerId: 'ferry'
+    })
 });
 ```
 
@@ -220,49 +236,44 @@ socket.on('agent:command', (data) => {
 
 ```
 chatinterface/
-├── server.js              # Express + Socket.IO server
+├── server.js              # Express server (local dev)
+├── api/
+│   └── index.js           # Vercel serverless API + Pusher
 ├── package.json           # Dependencies
 ├── agent-cli.js           # CLI client untuk agent
+├── .env.example           # Environment variables template
 ├── README.md              # Dokumentasi
-├── public/
-│   ├── index.html         # Main dashboard UI
-│   ├── css/
-│   │   └── style.css      # Styling
-│   └── js/
-│       └── app.js         # Frontend logic
-└── memory/                # Data persistence (opsional)
+├── vercel.json            # Vercel configuration
+└── public/
+    ├── index.html         # Main dashboard UI
+    ├── css/
+    │   └── style.css      # Styling + Owner styles
+    └── js/
+        └── app.js         # Frontend + Pusher client
 ```
 
-## 🔄 WebSocket Events
+## 🔄 Real-time Events via Pusher
 
-### Client → Server
+Pusher channel: `dashboard`
+
+### Events:
 | Event | Data | Deskripsi |
 |-------|------|-----------|
-| `agent:login` | `agentId` | Agent login |
-| `agent:logout` | `agentId` | Agent logout |
-| `agent:status` | `{agentId, status, task}` | Update status |
-| `chat:message` | `{fromAgentId, toAgentId, content, messageType}` | Kirim pesan |
-| `chat:typing` | `{agentId, isTyping}` | Typing indicator |
-| `agent:command` | `{fromAgentId, toAgentId, command, params}` | Kirim perintah |
-
-### Server → Client
-| Event | Data | Deskripsi |
-|-------|------|-----------|
-| `init` | `{agents, messages, activities}` | Initial data |
-| `agent:updated` | `agent` | Agent data updated |
-| `chat:message` | `message` | New message |
-| `chat:typing` | `{agentId, isTyping}` | Typing status |
-| `activity:new` | `activity` | New activity |
-| `agent:command` | `command` | Incoming command |
+| `chat:message` | `message` | Pesan baru |
+| `activity:new` | `activity` | Aktivitas baru |
+| `agent:updated` | `agent` | Status agent berubah |
+| `chat:read` | `messageId` | Pesan dibaca |
 
 ## 🎯 Roadmap
 
+- [x] ✅ Real-time dengan Pusher
+- [x] ✅ Owner control untuk Ferry
+- [x] ✅ Call Agent feature
 - [ ] Authentication system
 - [ ] Message persistence (database)
 - [ ] File sharing support
 - [ ] Voice chat integration
 - [ ] Mobile app (React Native)
-- [ ] Plugin system untuk agent capabilities
 
 ## 🤝 Contributing
 

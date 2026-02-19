@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenClaw Agent Dashboard</title>
+    <title>OpenClaw Agent Dashboard - Owner Control</title>
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Pusher for Real-time -->
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -15,6 +17,7 @@
             <div class="logo">
                 <i class="fas fa-network-wired"></i>
                 <span>OpenClaw</span>
+                <span class="owner-indicator" title="Ferry - Owner">👑</span>
             </div>
             
             <nav class="nav-menu">
@@ -37,10 +40,21 @@
                 </a>
             </nav>
             
+            <!-- Owner Call Section -->
+            <div class="sidebar-section owner-section">
+                <h4><i class="fas fa-crown"></i> Owner Control</h4>
+                <button class="btn btn-owner" id="owner-call-btn">
+                    <i class="fas fa-phone-alt"></i> Call Agent
+                </button>
+            </div>
+            
             <div class="sidebar-footer">
                 <div class="connection-status">
                     <span class="status-dot" id="conn-status"></span>
                     <span id="conn-text">Connecting...</span>
+                </div>
+                <div class="owner-status">
+                    <span class="owner-badge-sidebar">👑 Ferry - Owner</span>
                 </div>
             </div>
         </aside>
@@ -69,6 +83,19 @@
 
             <!-- Dashboard View -->
             <div class="view" id="dashboard-view">
+                <div class="owner-welcome-banner">
+                    <div class="owner-avatar-large">👤</div>
+                    <div class="owner-welcome-text">
+                        <h2>Welcome back, Ferry! 👑</h2>
+                        <p>You are the <strong>Owner</strong> of all agents. You can call any agent directly, manage their tasks, and monitor all activities in real-time.</p>
+                    </div>
+                    <div class="owner-quick-actions">
+                        <button class="btn btn-primary" onclick="window.dashboard.toggleOwnerCallModal()">
+                            <i class="fas fa-phone-alt"></i> Call Agent Now
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon online">
@@ -213,8 +240,16 @@
 
             <!-- Agents View -->
             <div class="view hidden" id="agents-view">
-                <div class="agents-list" id="agents-list">
-                    <!-- Agent details will be inserted here -->
+                <div class="panel owner-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-users-cog"></i> Agent Management</h3>
+                        <span class="owner-tag-header">👑 Owner Access</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="agents-list" id="agents-list">
+                            <!-- Agent details will be inserted here -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -262,6 +297,52 @@
                 </button>
             </div>
             <button class="btn btn-secondary" id="observer-mode">Observer Mode</button>
+        </div>
+    </div>
+
+    <!-- Owner Call Agent Modal -->
+    <div class="modal hidden" id="owner-call-modal">
+        <div class="modal-content owner-call-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-crown"></i> Owner Call Agent</h2>
+                <button class="modal-close" id="close-owner-call">&times;</button>
+            </div>
+            <p class="modal-desc">As the Owner, you can call any agent directly and give them commands.</p>
+            
+            <div class="owner-call-agents">
+                <h4>Select Agent:</h4>
+                <div class="owner-call-agent-grid">
+                    <button class="owner-call-agent-btn" data-agent="jarvis">
+                        <span class="agent-avatar">🤖</span>
+                        <span class="agent-name">Jarvis</span>
+                    </button>
+                    <button class="owner-call-agent-btn" data-agent="friday">
+                        <span class="agent-avatar">👩‍💼</span>
+                        <span class="agent-name">Friday</span>
+                    </button>
+                    <button class="owner-call-agent-btn" data-agent="glass">
+                        <span class="agent-avatar">🔍</span>
+                        <span class="agent-name">Glass</span>
+                    </button>
+                    <button class="owner-call-agent-btn" data-agent="epstein">
+                        <span class="agent-avatar">🧠</span>
+                        <span class="agent-name">Epstein</span>
+                    </button>
+                    <button class="owner-call-agent-btn" data-agent="yuri">
+                        <span class="agent-avatar">👨‍🚀</span>
+                        <span class="agent-name">Yuri</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="owner-call-input-area">
+                <input type="hidden" id="owner-call-target" value="">
+                <label for="owner-call-input">Command:</label>
+                <input type="text" id="owner-call-input" placeholder="Enter your command to the agent..." autocomplete="off">
+                <button class="btn btn-primary btn-full" id="send-owner-call">
+                    <i class="fas fa-phone-alt"></i> Call Agent
+                </button>
+            </div>
         </div>
     </div>
 
