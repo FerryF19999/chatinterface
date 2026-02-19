@@ -99,6 +99,80 @@ function addMessage(fromAgentId, toAgentId, content, messageType = 'text') {
   return message;
 }
 
+// Agent personalities and system prompts
+const AGENT_PERSONALITIES = {
+  jarvis: {
+    name: 'Jarvis',
+    personality: 'You are Jarvis, an efficient and professional AI assistant. You are helpful, concise, and focused on productivity. You speak in a formal but friendly manner. You excel at task management, automation, and technical assistance.',
+    tone: 'professional and efficient'
+  },
+  friday: {
+    name: 'Friday',
+    personality: 'You are Friday, an executive assistant agent. You are organized, detail-oriented, and proactive. You help with scheduling, research, documentation, and general executive tasks. You speak in a warm, professional manner.',
+    tone: 'warm and organized'
+  },
+  glass: {
+    name: 'Glass',
+    personality: 'You are Glass, a research and analytics specialist. You are analytical, precise, and thorough. You excel at data analysis, research, investigation, and finding patterns. You speak clearly and factually.',
+    tone: 'analytical and precise'
+  },
+  epstein: {
+    name: 'Epstein',
+    personality: 'You are Epstein, a knowledgeable advisor and intellectual. You enjoy deep discussions, knowledge sharing, and complex problem solving. You are thoughtful, well-read, and enjoy philosophical and intellectual conversations.',
+    tone: 'thoughtful and intellectual'
+  },
+  yuri: {
+    name: 'Yuri',
+    personality: 'You are Yuri, a space and exploration specialist with an adventurous spirit. You are bold, enthusiastic, and ready for challenges. You speak with energy and are always ready to take on missions.',
+    tone: 'enthusiastic and bold'
+  }
+};
+
+// Call Anthropic API for agent response
+async function callAgentAI(agentId, userMessage, userId = 'ferry') {
+  const agent = AGENT_PERSONALITIES[agentId];
+  if (!agent) {
+    throw new Error(`Unknown agent: ${agentId}`);
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY not configured');
+  }
+
+  const systemPrompt = `${agent.personality}
+
+You are responding to ${userId}. Keep your response concise (2-4 sentences) and in character. Be helpful and engaging.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  } catch (error) {
+    console.error('AI call failed:', error);
+    // Fallback response if AI fails
+    return `Hello ${userId}! I'm ${agent.name}. I received your message: "${userMessage}". How can I assist you further?`;
+  }
+}
+
 // CORS middleware
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -258,55 +332,53 @@ app.post('/api/activities', (req, res) => {
 // Owner calls agent directly - Ferry can invoke any agent
 app.post('/api/owner/call-agent', async (req, res) => {
   const { agentId, command, params, ownerId = 'ferry' } = req.body;
-  
+
   if (!agentId || !command) {
     return res.status(400).json({ error: 'agentId and command are required' });
   }
-  
+
   // Validate owner
   if (!USERS[ownerId] || USERS[ownerId].role !== 'owner') {
     return res.status(403).json({ error: 'Only owner can call agents directly' });
   }
-  
+
   // Validate agent exists
   if (!agentStates[agentId]) {
     return res.status(404).json({ error: 'Agent not found' });
   }
-  
+
   const targetAgent = agentStates[agentId];
-  
+
   // Add activity for the command
-  addActivity(agentId, 'command', `📞 Owner ${USERS[ownerId].name} called with: ${command}`, { 
-    fromOwner: ownerId, 
+  addActivity(agentId, 'command', `📞 Owner ${USERS[ownerId].name} called with: ${command}`, {
+    fromOwner: ownerId,
     params,
     commandType: 'owner-call'
   });
-  
+
   // Add a message showing the owner called the agent
   const callMessage = addMessage(ownerId, agentId, `📞 /call ${agentId}: ${command} ${params || ''}`.trim(), 'owner-call');
-  
-  // Simulate agent response after a short delay
-  setTimeout(() => {
-    const responses = {
-      jarvis: `Yes ${USERS[ownerId].name}! Jarvis here. Executing: ${command}`,
-      friday: `At your service, ${USERS[ownerId].name}! Friday processing: ${command}`,
-      glass: `${USERS[ownerId].name}, Glass investigating: ${command}`,
-      epstein: `${USERS[ownerId].name}, Epstein analyzing your request: ${command}`,
-      yuri: `Aye aye, ${USERS[ownerId].name}! Yuri on mission: ${command}`
-    };
-    
-    const responseText = responses[agentId] || `Hello ${USERS[ownerId].name}! ${targetAgent.name} ready to execute: ${command}`;
-    const responseMessage = addMessage(agentId, ownerId, responseText, 'agent-response');
-    
-    addActivity(agentId, 'message', `Responded to Owner ${USERS[ownerId].name}'s call`, { 
-      command, 
-      responseId: responseMessage.id,
-      commandType: 'owner-call'
-    });
-  }, 800);
-  
-  res.status(202).json({ 
-    success: true, 
+
+  // Call actual AI agent for response
+  (async () => {
+    try {
+      const aiResponse = await callAgentAI(agentId, command, USERS[ownerId].name);
+
+      const responseMessage = addMessage(agentId, ownerId, aiResponse, 'agent-response');
+
+      addActivity(agentId, 'message', `Responded to Owner ${USERS[ownerId].name}'s call`, {
+        command,
+        responseId: responseMessage.id,
+        commandType: 'owner-call'
+      });
+    } catch (error) {
+      console.error('Owner call agent response error:', error);
+      const errorMessage = addMessage(agentId, ownerId, `Sorry ${USERS[ownerId].name}, I encountered an error processing your request.`, 'agent-response');
+    }
+  })();
+
+  res.status(202).json({
+    success: true,
     message: `📞 Called ${targetAgent.name}`,
     callId: callMessage.id,
     ownerCall: true
@@ -324,48 +396,48 @@ app.get('/api/owner/call-history', (req, res) => {
 // Agent command endpoint - allows users to call agents via /agentname command
 app.post('/api/agent-command', async (req, res) => {
   const { agentId, command, params, userId = 'ferry' } = req.body;
-  
+
   if (!agentId || !command) {
     return res.status(400).json({ error: 'agentId and command are required' });
   }
-  
+
   // Validate agent exists
   if (!agentStates[agentId]) {
     return res.status(404).json({ error: 'Agent not found' });
   }
-  
+
   const targetAgent = agentStates[agentId];
-  
+
   // Add activity for the command
-  addActivity(agentId, 'command', `Received command from ${userId}: ${command}`, { 
-    fromUser: userId, 
-    params 
+  addActivity(agentId, 'command', `Received command from ${userId}: ${command}`, {
+    fromUser: userId,
+    params
   });
-  
+
   // Add a message showing the command was sent
   const commandMessage = addMessage(userId, agentId, `/${agentId} ${command} ${params || ''}`.trim(), 'command');
-  
-  // Simulate agent response (in real implementation, this would trigger the actual agent)
-  setTimeout(() => {
-    const responses = {
-      jarvis: `Hello ${userId}! I'm Jarvis, your AI assistant. How can I help you today?`,
-      friday: `Hi ${userId}! Friday here. I'm ready to assist you with any tasks.`,
-      glass: `Greetings ${userId}. Glass analyzing... What would you like me to investigate?`,
-      epstein: `Hello ${userId}. Epstein here. Ready for knowledge sharing and deep discussions.`,
-      yuri: `Hey ${userId}! Yuri reporting for duty. What mission are we on today?`
-    };
-    
-    const responseText = responses[agentId] || `Hello ${userId}! ${targetAgent.name} is ready to help.`;
-    const responseMessage = addMessage(agentId, userId, responseText, 'text');
-    
-    addActivity(agentId, 'message', `Responded to ${userId}'s command`, { 
-      command, 
-      responseId: responseMessage.id 
-    });
-  }, 1000);
-  
-  res.status(202).json({ 
-    success: true, 
+
+  // Call actual AI agent for response
+  (async () => {
+    try {
+      // Get AI response
+      const aiResponse = await callAgentAI(agentId, command, userId);
+
+      const responseMessage = addMessage(agentId, userId, aiResponse, 'text');
+
+      addActivity(agentId, 'message', `Responded to ${userId}'s command`, {
+        command,
+        responseId: responseMessage.id
+      });
+    } catch (error) {
+      console.error('Agent response error:', error);
+      // Send error message
+      const errorMessage = addMessage(agentId, userId, `Sorry ${userId}, I encountered an error processing your request. Please try again.`, 'text');
+    }
+  })();
+
+  res.status(202).json({
+    success: true,
     message: `Command sent to ${targetAgent.name}`,
     commandId: commandMessage.id
   });
