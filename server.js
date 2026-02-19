@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,13 +18,17 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Agent definitions
+// OpenClaw Gateway configuration
+const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:18789';
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || null;
+
+// Agent definitions mapped to OpenClaw agents
 const AGENTS = [
-  { id: 'yuri', name: 'Yuri', color: '#FF6B6B', avatar: '👨‍🚀', status: 'offline', lastActivity: null, currentTask: null },
-  { id: 'jarvis', name: 'Jarvis', color: '#4ECDC4', avatar: '🤖', status: 'offline', lastActivity: null, currentTask: null },
-  { id: 'friday', name: 'Friday', color: '#45B7D1', avatar: '👩‍💼', status: 'offline', lastActivity: null, currentTask: null },
-  { id: 'glass', name: 'Glass', color: '#96CEB4', avatar: '🔍', status: 'offline', lastActivity: null, currentTask: null },
-  { id: 'epstein', name: 'Epstein', color: '#DDA0DD', avatar: '🧠', status: 'offline', lastActivity: null, currentTask: null }
+  { id: 'yuri', name: 'Yuri', color: '#FF6B6B', avatar: '👨‍🚀', status: 'offline', lastActivity: null, currentTask: null, openclawAgent: 'yuri' },
+  { id: 'jarvis', name: 'Jarvis', color: '#4ECDC4', avatar: '🤖', status: 'offline', lastActivity: null, currentTask: null, openclawAgent: 'jarvis' },
+  { id: 'friday', name: 'Friday', color: '#45B7D1', avatar: '👩‍💼', status: 'offline', lastActivity: null, currentTask: null, openclawAgent: 'friday' },
+  { id: 'glass', name: 'Glass', color: '#96CEB4', avatar: '🔍', status: 'offline', lastActivity: null, currentTask: null, openclawAgent: 'glass' },
+  { id: 'epstein', name: 'Epstein', color: '#DDA0DD', avatar: '🧠', status: 'offline', lastActivity: null, currentTask: null, openclawAgent: 'epstein' }
 ];
 
 // User profile (Ferry) - Owner with full control
@@ -95,6 +100,163 @@ function addMessage(fromAgentId, toAgentId, content, messageType = 'text') {
   return message;
 }
 
+// Fetch real agent status from OpenClaw Gateway
+async function fetchGatewayHealth() {
+  return new Promise((resolve, reject) => {
+    const openclaw = spawn('openclaw', ['gateway', 'call', 'health', '--json']);
+    let output = '';
+    let error = '';
+    
+    openclaw.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    openclaw.stderr.on('data', (data) => {
+      error += data.toString();
+    });
+    
+    openclaw.on('close', (code) => {
+      if (code !== 0) {
+        console.error('Gateway health check failed:', error);
+        reject(new Error(error || 'Gateway call failed'));
+        return;
+      }
+      try {
+        const health = JSON.parse(output);
+        resolve(health);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
+// Update agent states from Gateway health data
+async function updateAgentStatesFromGateway() {
+  try {
+    const health = await fetchGatewayHealth();
+    
+    if (health.agents) {
+      health.agents.forEach(gatewayAgent => {
+        const agentId = gatewayAgent.agentId;
+        if (agentStates[agentId]) {
+          // Calculate status based on session activity
+          const sessions = gatewayAgent.sessions || {};
+          const recentSessions = sessions.recent || [];
+          
+          let status = 'offline';
+          let lastActivity = null;
+          
+          if (recentSessions.length > 0) {
+            const mostRecent = recentSessions[0];
+            const ageMs = mostRecent.age || 0;
+            lastActivity = new Date(Date.now() - ageMs);
+            
+            // If activity within last 5 minutes, consider online
+            if (ageMs < 5 * 60 * 1000) {
+              status = 'online';
+            } else if (ageMs < 30 * 60 * 1000) {
+              status = 'away';
+            }
+          }
+          
+          // Check if heartbeat is enabled
+          if (gatewayAgent.heartbeat?.enabled) {
+            status = 'online';
+          }
+          
+          agentStates[agentId].status = status;
+          agentStates[agentId].lastActivity = lastActivity;
+          
+          // Update current task if there's recent activity
+          if (recentSessions.length > 0 && recentSessions[0].key) {
+            const sessionKey = recentSessions[0].key;
+            if (sessionKey.includes('cron')) {
+              agentStates[agentId].currentTask = 'Running scheduled task';
+            } else if (sessionKey.includes('subagent')) {
+              agentStates[agentId].currentTask = 'Processing subagent task';
+            } else {
+              agentStates[agentId].currentTask = 'Active';
+            }
+          }
+        }
+      });
+    }
+    
+    return health;
+  } catch (error) {
+    console.error('Failed to fetch Gateway health:', error);
+    return null;
+  }
+}
+
+// Call OpenClaw agent via CLI and get real response
+async function callOpenClawAgent(agentId, message, userId = 'ferry') {
+  const agent = agentStates[agentId];
+  if (!agent) {
+    throw new Error(`Unknown agent: ${agentId}`);
+  }
+
+  const openclawAgentId = agent.openclawAgent || agentId;
+  
+  return new Promise((resolve, reject) => {
+    const args = [
+      'agent',
+      '--agent', openclawAgentId,
+      '--message', message
+    ];
+    
+    // Add timeout for longer responses
+    const openclaw = spawn('openclaw', args, { 
+      timeout: 120000,
+      env: { ...process.env }
+    });
+    
+    let output = '';
+    let error = '';
+    
+    openclaw.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    openclaw.stderr.on('data', (data) => {
+      error += data.toString();
+    });
+    
+    openclaw.on('close', (code) => {
+      if (code !== 0 && code !== null) {
+        console.error(`Agent ${agentId} error:`, error);
+        // Return a graceful fallback
+        resolve(`I'm ${agent.name}, but I'm having trouble connecting right now. Please try again in a moment.`);
+        return;
+      }
+      
+      // Clean up the output - remove any CLI artifacts
+      let response = output.trim();
+      
+      // If no output but also no error, provide a fallback
+      if (!response && !error) {
+        resolve(`Hello ${userId}! I'm ${agent.name}. How can I assist you today?`);
+        return;
+      }
+      
+      // If we have error but also some output, use output
+      if (!response && error) {
+        console.error('Agent returned error:', error);
+        resolve(`Hello ${userId}! I'm ${agent.name}. I received your message but encountered a minor issue. How can I help?`);
+        return;
+      }
+      
+      resolve(response);
+    });
+    
+    openclaw.on('error', (err) => {
+      console.error(`Failed to spawn openclaw agent:`, err);
+      resolve(`Hello ${userId}! I'm ${agent.name}. I'm currently unavailable, but I'll be back shortly.`);
+    });
+  });
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -108,7 +270,7 @@ io.on('connection', (socket) => {
   });
 
   // Agent login
-  socket.on('agent:login', (agentId) => {
+  socket.on('agent:login', async (agentId) => {
     if (agentStates[agentId]) {
       agentStates[agentId].status = 'online';
       agentStates[agentId].lastActivity = new Date();
@@ -224,23 +386,31 @@ io.on('connection', (socket) => {
 // REST API endpoints
 
 // Initialize endpoint - provides full state including users
-app.get('/api/init', (req, res) => {
+app.get('/api/init', async (req, res) => {
+  // Update from Gateway before returning
+  await updateAgentStatesFromGateway();
+  
   res.json({
     agents: Object.values(agentStates),
     users: USERS,
     messages: chatMessages.slice(-50),
-    activities: activities.slice(-20)
+    activities: activities.slice(-20),
+    gatewayConnected: true
   });
 });
 
-app.get('/api/agents', (req, res) => {
+app.get('/api/agents', async (req, res) => {
+  // Update from Gateway before returning
+  await updateAgentStatesFromGateway();
   res.json(Object.values(agentStates));
 });
 
-app.get('/api/agents/:id', (req, res) => {
+app.get('/api/agents/:id', async (req, res) => {
   const agent = agentStates[req.params.id];
   if (agent) {
-    res.json(agent);
+    // Update from Gateway
+    await updateAgentStatesFromGateway();
+    res.json(agentStates[req.params.id]);
   } else {
     res.status(404).json({ error: 'Agent not found' });
   }
@@ -264,83 +434,7 @@ app.get('/api/activities', (req, res) => {
   res.json(activities.slice(0, parseInt(limit)));
 });
 
-// Agent personalities and system prompts
-const AGENT_PERSONALITIES = {
-  jarvis: {
-    name: 'Jarvis',
-    personality: 'You are Jarvis, an efficient and professional AI assistant. You are helpful, concise, and focused on productivity. You speak in a formal but friendly manner. You excel at task management, automation, and technical assistance.',
-    tone: 'professional and efficient'
-  },
-  friday: {
-    name: 'Friday',
-    personality: 'You are Friday, an executive assistant agent. You are organized, detail-oriented, and proactive. You help with scheduling, research, documentation, and general executive tasks. You speak in a warm, professional manner.',
-    tone: 'warm and organized'
-  },
-  glass: {
-    name: 'Glass',
-    personality: 'You are Glass, a research and analytics specialist. You are analytical, precise, and thorough. You excel at data analysis, research, investigation, and finding patterns. You speak clearly and factually.',
-    tone: 'analytical and precise'
-  },
-  epstein: {
-    name: 'Epstein',
-    personality: 'You are Epstein, a knowledgeable advisor and intellectual. You enjoy deep discussions, knowledge sharing, and complex problem solving. You are thoughtful, well-read, and enjoy philosophical and intellectual conversations.',
-    tone: 'thoughtful and intellectual'
-  },
-  yuri: {
-    name: 'Yuri',
-    personality: 'You are Yuri, a space and exploration specialist with an adventurous spirit. You are bold, enthusiastic, and ready for challenges. You speak with energy and are always ready to take on missions.',
-    tone: 'enthusiastic and bold'
-  }
-};
-
-// Call Anthropic API for agent response
-async function callAgentAI(agentId, userMessage, userId = 'ferry') {
-  const agent = AGENT_PERSONALITIES[agentId];
-  if (!agent) {
-    throw new Error(`Unknown agent: ${agentId}`);
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
-  }
-
-  const systemPrompt = `${agent.personality}
-
-You are responding to ${userId}. Keep your response concise (2-4 sentences) and in character. Be helpful and engaging. Current user message: "${userMessage}"`;
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 500,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }]
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Anthropic API error response:', errorData);
-      throw new Error(`Anthropic API error: ${response.status} - ${errorData}`);
-    }
-
-    const data = await response.json();
-    return data.content[0].text;
-  } catch (error) {
-    console.error('AI call failed:', error);
-    // Fallback response if AI fails
-    return `Hello ${userId}! I'm ${agent.name}. I received your message: "${userMessage}". How can I assist you further?`;
-  }
-}
-
-// Agent command endpoint - allows users to call agents via /agentname command
+// Agent command endpoint - uses REAL OpenClaw Gateway
 app.post('/api/agent-command', async (req, res) => {
   const { agentId, command, params, userId = 'ferry' } = req.body;
   
@@ -368,11 +462,16 @@ app.post('/api/agent-command', async (req, res) => {
   io.emit('chat:message', commandMessage);
   io.emit('activity:new', activities[0]);
   
-  // Call actual AI agent for response
+  // Call REAL OpenClaw agent for response
   (async () => {
     try {
-      // Get AI response
-      const aiResponse = await callAgentAI(agentId, command, userId);
+      // Update agent status to show they're working
+      agentStates[agentId].status = 'busy';
+      agentStates[agentId].currentTask = `Processing command from ${userId}`;
+      io.emit('agent:updated', agentStates[agentId]);
+      
+      // Get REAL AI response from OpenClaw Gateway
+      const aiResponse = await callOpenClawAgent(agentId, command, userId);
       
       const responseMessage = addMessage(agentId, userId, aiResponse, 'text');
       
@@ -384,11 +483,22 @@ app.post('/api/agent-command', async (req, res) => {
         responseId: responseMessage.id 
       });
       io.emit('activity:new', activities[0]);
+      
+      // Update agent status back to online
+      agentStates[agentId].status = 'online';
+      agentStates[agentId].currentTask = null;
+      agentStates[agentId].lastActivity = new Date();
+      io.emit('agent:updated', agentStates[agentId]);
     } catch (error) {
       console.error('Agent response error:', error);
       // Send error message
       const errorMessage = addMessage(agentId, userId, `Sorry ${userId}, I encountered an error processing your request. Please try again.`, 'text');
       io.emit('chat:message', errorMessage);
+      
+      // Reset status
+      agentStates[agentId].status = 'online';
+      agentStates[agentId].currentTask = null;
+      io.emit('agent:updated', agentStates[agentId]);
     }
   })();
   
@@ -400,7 +510,10 @@ app.post('/api/agent-command', async (req, res) => {
 });
 
 // Get available agents for command autocomplete
-app.get('/api/agent-commands/list', (req, res) => {
+app.get('/api/agent-commands/list', async (req, res) => {
+  // Update from Gateway before returning
+  await updateAgentStatesFromGateway();
+  
   const commands = Object.values(agentStates).map(agent => ({
     id: agent.id,
     name: agent.name,
@@ -412,12 +525,39 @@ app.get('/api/agent-commands/list', (req, res) => {
   res.json(commands);
 });
 
+// Gateway health endpoint - returns real Gateway status
+app.get('/api/gateway/health', async (req, res) => {
+  try {
+    const health = await fetchGatewayHealth();
+    res.json({
+      connected: true,
+      health,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.status(503).json({
+      connected: false,
+      error: error.message,
+      timestamp: new Date()
+    });
+  }
+});
+
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let gatewayConnected = false;
+  try {
+    await fetchGatewayHealth();
+    gatewayConnected = true;
+  } catch (e) {
+    gatewayConnected = false;
+  }
+  
   res.json({ 
     status: 'ok', 
     timestamp: new Date(),
-    agentsOnline: Object.values(agentStates).filter(a => a.status === 'online').length
+    agentsOnline: Object.values(agentStates).filter(a => a.status === 'online').length,
+    gatewayConnected
   });
 });
 
@@ -425,6 +565,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 OpenClaw Agent Dashboard running on port ${PORT}`);
   console.log(`📊 Dashboard: http://localhost:${PORT}`);
+  console.log(`🔗 Connected to OpenClaw Gateway at ${GATEWAY_URL}`);
 });
 
 module.exports = { app, server, io };

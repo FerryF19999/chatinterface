@@ -86,6 +86,19 @@ class AgentDashboard {
     startPolling() {
         console.log('Starting polling fallback...');
         setInterval(() => this.pollForUpdates(), 2000);
+        // Also poll Gateway health every 10 seconds
+        setInterval(() => this.pollGatewayHealth(), 10000);
+    }
+    
+    // Poll Gateway health status
+    async pollGatewayHealth() {
+        try {
+            const health = await this.apiGet('/gateway/health');
+            this.updateGatewayStatus(health.connected);
+        } catch (error) {
+            console.warn('Gateway health check failed:', error);
+            this.updateGatewayStatus(false);
+        }
     }
     
     async pollForUpdates() {
@@ -249,15 +262,66 @@ class AgentDashboard {
                 this.lastActivityId = activities[0].id;
             }
             
+            // Check Gateway connection status
+            if (data.gatewayConnected) {
+                this.gatewayConnected = true;
+                console.log('✅ OpenClaw Gateway connected');
+            } else {
+                this.gatewayConnected = false;
+                console.warn('⚠️ OpenClaw Gateway not connected');
+            }
+            
             this.renderAgents();
             this.renderStats();
             this.renderActivity();
             this.renderMessages();
             this.renderDMList();
             this.updateConnectionStatus(true);
+            this.updateGatewayStatus(data.gatewayConnected);
         } catch (error) {
             console.error('Failed to load initial data:', error);
             this.updateConnectionStatus(false);
+            this.updateGatewayStatus(false);
+        }
+    }
+    
+    // Update Gateway connection status in UI
+    updateGatewayStatus(connected) {
+        this.gatewayConnected = connected;
+        
+        // Update connection status text to include Gateway info
+        const connText = document.getElementById('conn-text');
+        if (connText) {
+            if (connected) {
+                connText.innerHTML = '⚡ Real-time · 🔗 Gateway';
+                connText.style.color = '#4ade80';
+            } else {
+                connText.innerHTML = '⚡ Real-time · 🔴 Gateway Offline';
+                connText.style.color = '#fbbf24';
+            }
+        }
+        
+        // Add Gateway status indicator if not exists
+        const sidebarFooter = document.querySelector('.sidebar-footer');
+        if (sidebarFooter) {
+            let gatewayStatus = document.getElementById('gateway-status');
+            if (!gatewayStatus) {
+                gatewayStatus = document.createElement('div');
+                gatewayStatus.id = 'gateway-status';
+                gatewayStatus.className = 'gateway-status';
+                gatewayStatus.style.cssText = 'margin-top: 8px; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;';
+                sidebarFooter.insertBefore(gatewayStatus, sidebarFooter.firstChild);
+            }
+            
+            if (connected) {
+                gatewayStatus.innerHTML = '🟢 OpenClaw Gateway Connected';
+                gatewayStatus.style.background = 'rgba(74, 222, 128, 0.1)';
+                gatewayStatus.style.color = '#4ade80';
+            } else {
+                gatewayStatus.innerHTML = '🔴 Gateway Disconnected';
+                gatewayStatus.style.background = 'rgba(248, 113, 113, 0.1)';
+                gatewayStatus.style.color = '#f87171';
+            }
         }
     }
     
