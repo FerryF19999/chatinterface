@@ -153,7 +153,7 @@ You are responding to ${userId}. Keep your response concise (2-4 sentences) and 
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 500,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }]
@@ -161,7 +161,9 @@ You are responding to ${userId}. Keep your response concise (2-4 sentences) and 
     });
 
     if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status}`);
+      const errorData = await response.text();
+      console.error('Anthropic API error response:', errorData);
+      throw new Error(`Anthropic API error: ${response.status} - ${errorData}`);
     }
 
     const data = await response.json();
