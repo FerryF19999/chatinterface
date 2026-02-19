@@ -1,7 +1,7 @@
-// OpenClaw Agent Dashboard - Frontend App
+// OpenClaw Agent Dashboard - Frontend App (Vercel Serverless Compatible)
 class AgentDashboard {
     constructor() {
-        this.socket = null;
+        this.apiUrl = '/api';
         this.currentAgent = null;
         this.currentView = 'dashboard';
         this.currentRoom = 'general';
@@ -10,30 +10,49 @@ class AgentDashboard {
         this.activities = [];
         this.unreadCount = 0;
         this.typingTimeout = null;
+        this.pollingInterval = null;
+        this.lastMessageId = null;
+        this.lastActivityId = null;
         
         this.init();
     }
     
     init() {
-        this.connectSocket();
         this.bindEvents();
-        this.checkLoginStatus();
+        this.loadInitialData();
+        this.startPolling();
     }
     
-    connectSocket() {
-        this.socket = io();
-        
-        this.socket.on('connect', () => {
-            this.updateConnectionStatus(true);
-            console.log('Connected to server');
+    // API Helpers
+    async apiGet(endpoint) {
+        const response = await fetch(`${this.apiUrl}${endpoint}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    }
+    
+    async apiPost(endpoint, data) {
+        const response = await fetch(`${this.apiUrl}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
-        
-        this.socket.on('disconnect', () => {
-            this.updateConnectionStatus(false);
-            console.log('Disconnected from server');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    }
+    
+    async apiPut(endpoint, data) {
+        const response = await fetch(`${this.apiUrl}${endpoint}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
-        
-        this.socket.on('init', (data) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    }
+    
+    async loadInitialData() {
+        try {
+            const data = await this.apiGet('/init');
             this.agents = data.agents.reduce((acc, agent) => {
                 acc[agent.id] = agent;
                 return acc;
@@ -41,43 +60,74 @@ class AgentDashboard {
             this.messages = data.messages;
             this.activities = data.activities;
             
+            // Track last IDs for polling
+            if (this.messages.length > 0) {
+                this.lastMessageId = this.messages[this.messages.length - 1].id;
+            }
+            if (this.activities.length > 0) {
+                this.lastActivityId = this.activities[0].id;
+            }
+            
             this.renderAgents();
             this.renderStats();
             this.renderActivity();
             this.renderMessages();
             this.renderDMList();
-        });
-        
-        this.socket.on('agent:updated', (agent) => {
-            this.agents[agent.id] = agent;
-            this.renderAgents();
-            this.renderStats();
-            this.renderDMList();
-        });
-        
-        this.socket.on('chat:message', (message) => {
-            this.messages.push(message);
-            this.appendMessage(message);
+            this.updateConnectionStatus(true);
+            this.checkLoginStatus();
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+            this.updateConnectionStatus(false);
+        }
+    }
+    
+    startPolling() {
+        // Poll for updates every 2 seconds
+        this.pollingInterval = setInterval(() => this.pollForUpdates(), 2000);
+    }
+    
+    async pollForUpdates() {
+        try {
+            // Poll agents
+            const agents = await this.apiGet('/agents');
+            const agentsChanged = JSON.stringify(agents) !== JSON.stringify(Object.values(this.agents));
+            if (agentsChanged) {
+                this.agents = agents.reduce((acc, agent) => {
+                    acc[agent.id] = agent;
+                    return acc;
+                }, {});
+                this.renderAgents();
+                this.renderStats();
+                this.renderDMList();
+            }
             
-            if (message.fromAgentId !== this.currentAgent) {
-                this.unreadCount++;
+            // Poll messages
+            const messages = await this.apiGet('/messages?limit=50');
+            if (messages.length > this.messages.length) {
+                const newMessages = messages.slice(this.messages.length);
+                newMessages.forEach(msg => {
+                    this.messages.push(msg);
+                    this.appendMessage(msg);
+                    if (msg.fromAgentId !== this.currentAgent) {
+                        this.unreadCount++;
+                    }
+                });
                 this.updateBadge();
             }
-        });
-        
-        this.socket.on('chat:typing', ({ agentId, isTyping }) => {
-            this.showTypingIndicator(agentId, isTyping);
-        });
-        
-        this.socket.on('activity:new', (activity) => {
-            this.activities.unshift(activity);
-            if (this.activities.length > 100) this.activities.pop();
-            this.prependActivity(activity);
-        });
-        
-        this.socket.on('agent:command', (command) => {
-            this.handleIncomingCommand(command);
-        });
+            
+            // Poll activities
+            const activities = await this.apiGet('/activities?limit=20');
+            if (activities.length > 0 && activities[0].id !== this.lastActivityId) {
+                this.activities = activities;
+                this.renderActivity();
+                this.lastActivityId = activities[0].id;
+            }
+            
+            this.updateConnectionStatus(true);
+        } catch (error) {
+            console.error('Polling error:', error);
+            this.updateConnectionStatus(false);
+        }
     }
     
     bindEvents() {
@@ -170,23 +220,29 @@ class AgentDashboard {
         document.getElementById('login-modal').classList.add('hidden');
     }
     
-    loginAs(agentId) {
+    async loginAs(agentId) {
         this.currentAgent = agentId;
         localStorage.setItem('currentAgent', agentId);
         
         document.getElementById('current-agent').value = agentId;
         this.closeLoginModal();
         
-        if (this.socket) {
-            this.socket.emit('agent:login', agentId);
+        try {
+            await this.apiPost(`/agents/${agentId}/login`);
+            this.addSystemMessage(`You are now logged in as ${this.agents[agentId]?.name || agentId}`);
+            this.renderAgents();
+        } catch (error) {
+            console.error('Login failed:', error);
         }
-        
-        this.addSystemMessage(`You are now logged in as ${this.agents[agentId]?.name || agentId}`);
     }
     
-    logout() {
-        if (this.currentAgent && this.socket) {
-            this.socket.emit('agent:logout', this.currentAgent);
+    async logout() {
+        if (this.currentAgent) {
+            try {
+                await this.apiPost(`/agents/${this.currentAgent}/logout`);
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
         }
         this.currentAgent = null;
         localStorage.removeItem('currentAgent');
@@ -296,7 +352,6 @@ class AgentDashboard {
                 div.innerHTML = this.createActivityHTML(activity);
                 list.insertBefore(div.firstElementChild, list.firstChild);
                 
-                // Keep only last items
                 while (list.children.length > (list.classList.contains('full') ? 100 : 10)) {
                     list.removeChild(list.lastChild);
                 }
@@ -400,7 +455,7 @@ class AgentDashboard {
     }
     
     // Chat functionality
-    sendMessage() {
+    async sendMessage() {
         const input = document.getElementById('message-input');
         const content = input.value.trim();
         
@@ -429,27 +484,26 @@ class AgentDashboard {
         if (this.currentRoom === 'commands') messageType = 'command';
         if (content.startsWith('/')) messageType = 'command';
         
-        this.socket.emit('chat:message', {
-            fromAgentId: this.currentAgent,
-            toAgentId,
-            content,
-            messageType
-        });
-        
-        input.value = '';
-        this.socket.emit('chat:typing', { agentId: this.currentAgent, isTyping: false });
+        try {
+            const message = await this.apiPost('/messages', {
+                fromAgentId: this.currentAgent,
+                toAgentId,
+                content,
+                messageType
+            });
+            
+            this.messages.push(message);
+            this.appendMessage(message);
+            input.value = '';
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            this.addSystemMessage('Failed to send message');
+        }
     }
     
     handleTyping() {
-        if (this.typingTimeout) clearTimeout(this.typingTimeout);
-        
-        if (this.currentAgent) {
-            this.socket.emit('chat:typing', { agentId: this.currentAgent, isTyping: true });
-            
-            this.typingTimeout = setTimeout(() => {
-                this.socket.emit('chat:typing', { agentId: this.currentAgent, isTyping: false });
-            }, 2000);
-        }
+        // Typing indicator not supported in REST API mode
+        // Could be implemented with a separate endpoint if needed
     }
     
     showTypingIndicator(agentId, isTyping) {
@@ -469,15 +523,19 @@ class AgentDashboard {
         this.addSystemMessage(`Command from ${this.agents[command.fromAgentId]?.name}: ${command.command}`);
     }
     
-    sendCommand(toAgentId, command, params = {}) {
+    async sendCommand(toAgentId, command, params = {}) {
         if (!this.currentAgent) return;
         
-        this.socket.emit('agent:command', {
-            fromAgentId: this.currentAgent,
-            toAgentId,
-            command,
-            params
-        });
+        try {
+            await this.apiPost('/activities', {
+                agentId: this.currentAgent,
+                type: 'command',
+                description: `Executed command: ${command}`,
+                metadata: { toAgentId, params }
+            });
+        } catch (error) {
+            console.error('Failed to send command:', error);
+        }
     }
     
     // Helpers

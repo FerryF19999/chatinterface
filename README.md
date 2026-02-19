@@ -46,6 +46,38 @@ npm run dev
 
 Dashboard akan tersedia di `http://localhost:3000`
 
+## 🚀 Deploy ke Vercel
+
+Project ini sudah dikonfigurasi untuk **Vercel Serverless**.
+
+### Deploy via Vercel CLI:
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Login ke Vercel
+vercel login
+
+# Deploy
+vercel --prod
+```
+
+### Deploy via GitHub:
+
+1. Push code ke GitHub repository
+2. Connect repository di [Vercel Dashboard](https://vercel.com/dashboard)
+3. Vercel akan auto-detect `vercel.json` dan deploy
+
+### ⚠️ Catatan Penting:
+
+- **Socket.IO** tidak compatible dengan Vercel Serverless (stateless)
+- Project menggunakan **REST API + Polling** sebagai alternatif
+- Untuk production dengan realtime features, pertimbangkan menggunakan:
+  - [Pusher](https://pusher.com/) untuk realtime events
+  - [Ably](https://ably.com/) untuk WebSocket
+  - Deploy Socket.IO server terpisah di platform yang support persistent connection
+
 ## 👥 Agents
 
 | Agent | Avatar | Warna | Deskripsi |
