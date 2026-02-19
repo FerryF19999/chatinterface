@@ -26,9 +26,20 @@ const AGENTS = [
   { id: 'epstein', name: 'Epstein', color: '#DDA0DD', avatar: '🧠', status: 'offline', lastActivity: null, currentTask: null }
 ];
 
-// User profile (Ferry)
+// User profile (Ferry) - Owner with full control
 const USERS = {
-  ferry: { id: 'ferry', name: 'Ferry', color: '#FFD700', avatar: '👤', status: 'online', isUser: true }
+  ferry: { 
+    id: 'ferry', 
+    name: 'Ferry', 
+    color: '#FFD700', 
+    avatar: '👤', 
+    status: 'online', 
+    isUser: true,
+    role: 'owner',
+    roleLabel: 'Owner',
+    canManageAgents: true,
+    canCallAgents: true
+  }
 };
 
 // State management
@@ -91,6 +102,7 @@ io.on('connection', (socket) => {
   // Send current state to new client
   socket.emit('init', {
     agents: Object.values(agentStates),
+    users: USERS,
     messages: chatMessages.slice(-50),
     activities: activities.slice(-20)
   });
@@ -210,6 +222,17 @@ io.on('connection', (socket) => {
 });
 
 // REST API endpoints
+
+// Initialize endpoint - provides full state including users
+app.get('/api/init', (req, res) => {
+  res.json({
+    agents: Object.values(agentStates),
+    users: USERS,
+    messages: chatMessages.slice(-50),
+    activities: activities.slice(-20)
+  });
+});
+
 app.get('/api/agents', (req, res) => {
   res.json(Object.values(agentStates));
 });

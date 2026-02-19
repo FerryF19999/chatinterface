@@ -551,7 +551,22 @@ class AgentDashboard {
         const list = document.getElementById('agents-list');
         
         if (grid) {
-            grid.innerHTML = Object.values(this.agents).map(agent => `
+            // Add Ferry as Owner card first, then agents
+            const ownerCard = `
+                <div class="agent-card owner online">
+                    <div class="agent-avatar-lg" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); border: 2px solid #FFD700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);">
+                        👤👑
+                    </div>
+                    <div class="agent-info">
+                        <h4>${this.userProfile.name} <span style="color: #FFD700; font-size: 0.75rem;">👑 OWNER</span></h4>
+                        <span class="status">
+                            <span class="agent-status-dot online"></span>
+                            online
+                        </span>
+                    </div>
+                </div>
+            `;
+            const agentCards = Object.values(this.agents).map(agent => `
                 <div class="agent-card ${agent.status}">
                     <div class="agent-avatar-lg" style="background: ${agent.color}20; border: 2px solid ${agent.color}">
                         ${agent.avatar}
@@ -565,6 +580,7 @@ class AgentDashboard {
                     </div>
                 </div>
             `).join('');
+            grid.innerHTML = ownerCard + agentCards;
         }
         
         if (list) {

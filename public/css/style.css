@@ -336,6 +336,26 @@ select {
     border-color: var(--warning);
 }
 
+.agent-card.owner {
+    border-color: #FFD700;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 165, 0, 0.1) 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.agent-card.owner::before {
+    content: '👑';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.875rem;
+    opacity: 0.5;
+}
+
+.agent-card.owner .agent-info h4 {
+    color: #FFD700;
+}
+
 .agent-avatar-lg {
     width: 48px;
     height: 48px;
