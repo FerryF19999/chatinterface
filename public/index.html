@@ -174,10 +174,34 @@
                                 <button class="toolbar-btn" title="Bold"><i class="fas fa-bold"></i></button>
                                 <button class="toolbar-btn" title="Italic"><i class="fas fa-italic"></i></button>
                                 <button class="toolbar-btn" title="Code"><i class="fas fa-code"></i></button>
-                                <button class="toolbar-btn" title="Command"><i class="fas fa-terminal"></i></button>
+                                <button class="toolbar-btn agent-cmd-btn" title="Call Agent" id="agent-cmd-btn">
+                                    <i class="fas fa-robot"></i> Call Agent
+                                </button>
+                                <div class="agent-cmd-dropdown" id="agent-cmd-dropdown" style="display: none;">
+                                    <div class="agent-cmd-item" data-agent="jarvis">
+                                        <span class="agent-cmd-avatar">🤖</span>
+                                        <span class="agent-cmd-name">/jarvis</span>
+                                    </div>
+                                    <div class="agent-cmd-item" data-agent="friday">
+                                        <span class="agent-cmd-avatar">👩‍💼</span>
+                                        <span class="agent-cmd-name">/friday</span>
+                                    </div>
+                                    <div class="agent-cmd-item" data-agent="glass">
+                                        <span class="agent-cmd-avatar">🔍</span>
+                                        <span class="agent-cmd-name">/glass</span>
+                                    </div>
+                                    <div class="agent-cmd-item" data-agent="epstein">
+                                        <span class="agent-cmd-avatar">🧠</span>
+                                        <span class="agent-cmd-name">/epstein</span>
+                                    </div>
+                                    <div class="agent-cmd-item" data-agent="yuri">
+                                        <span class="agent-cmd-avatar">👨‍🚀</span>
+                                        <span class="agent-cmd-name">/yuri</span>
+                                    </div>
+                                </div>
                             </div>
                             <div class="input-wrapper">
-                                <input type="text" id="message-input" placeholder="Type a message... (use @ to mention)" autocomplete="off">
+                                <input type="text" id="message-input" placeholder="Type /agentname to call an agent (e.g., /jarvis hello)" autocomplete="off">
                                 <button class="send-btn" id="send-btn">
                                     <i class="fas fa-paper-plane"></i>
                                 </button>

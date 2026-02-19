@@ -13,6 +13,13 @@ class AgentDashboard {
         this.pollingInterval = null;
         this.lastMessageId = null;
         this.lastActivityId = null;
+        this.userId = 'ferry'; // Current user is Ferry
+        this.userProfile = {
+            id: 'ferry',
+            name: 'Ferry',
+            avatar: '👤',
+            color: '#FFD700'
+        };
         
         this.init();
     }
@@ -57,6 +64,15 @@ class AgentDashboard {
                 acc[agent.id] = agent;
                 return acc;
             }, {});
+            
+            // Load users (Ferry, etc.)
+            if (data.users) {
+                this.users = data.users;
+                if (data.users.ferry) {
+                    this.userProfile = data.users.ferry;
+                }
+            }
+            
             this.messages = data.messages;
             this.activities = data.activities;
             
@@ -199,8 +215,72 @@ class AgentDashboard {
                 else if (title === 'Italic') this.wrapText(input, '*');
                 else if (title === 'Code') this.wrapText(input, '`');
                 else if (title === 'Command') this.wrapText(input, '/');
+                else if (title === 'Call Agent') this.toggleAgentDropdown();
             });
         });
+        
+        // Agent command dropdown items
+        document.querySelectorAll('.agent-cmd-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const agentId = item.dataset.agent;
+                const input = document.getElementById('message-input');
+                input.value = `/${agentId} `;
+                input.focus();
+                this.hideAgentDropdown();
+            });
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('agent-cmd-dropdown');
+            const btn = document.getElementById('agent-cmd-btn');
+            if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+                this.hideAgentDropdown();
+            }
+        });
+        
+        // DM item click - open direct message
+        document.getElementById('dm-list').addEventListener('click', (e) => {
+            const dmItem = e.target.closest('.dm-item');
+            if (dmItem) {
+                const agentId = dmItem.dataset.agent;
+                this.startDirectMessage(agentId);
+            }
+        });
+    }
+    
+    toggleAgentDropdown() {
+        const dropdown = document.getElementById('agent-cmd-dropdown');
+        if (dropdown.style.display === 'none') {
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.style.display = 'none';
+        }
+    }
+    
+    hideAgentDropdown() {
+        const dropdown = document.getElementById('agent-cmd-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    }
+    
+    startDirectMessage(agentId) {
+        const agent = this.agents[agentId];
+        if (!agent) return;
+        
+        // Switch to chat view
+        this.switchView('chat');
+        
+        // Update room name to show DM
+        document.getElementById('chat-room-name').textContent = `@${agent.name}`;
+        
+        // Set current room as DM
+        this.currentRoom = `dm-${agentId}`;
+        
+        // Focus input
+        document.getElementById('message-input').focus();
+        
+        // Add system message
+        this.addSystemMessage(`Starting direct message with ${agent.name}`);
     }
     
     checkLoginStatus() {
@@ -422,6 +502,25 @@ class AgentDashboard {
     }
     
     createMessageHTML(message) {
+        // Handle messages from user (Ferry)
+        if (message.fromAgentId === this.userId || message.fromAgentId === 'ferry') {
+            const isOwn = true;
+            return `
+                <div class="message ${isOwn ? 'own' : ''} user-message">
+                    <div class="message-avatar" style="background: ${this.userProfile.color}20; border: 2px solid ${this.userProfile.color}">
+                        ${this.userProfile.avatar}
+                    </div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-author" style="color: ${this.userProfile.color}">${this.userProfile.name}</span>
+                            <span class="message-time">${this.formatTime(message.timestamp)}</span>
+                        </div>
+                        <div class="message-text">${this.escapeHtml(message.content)}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
         const fromAgent = this.agents[message.fromAgentId];
         const isOwn = message.fromAgentId === this.currentAgent;
         
@@ -449,6 +548,9 @@ class AgentDashboard {
                     <span class="dm-avatar">${agent.avatar}</span>
                     <span class="dm-name">${agent.name}</span>
                     <span class="dm-status ${agent.status}"></span>
+                    <button class="dm-btn" onclick="window.dashboard.startDirectMessage('${agent.id}'); event.stopPropagation();">
+                        <i class="fas fa-comment"></i>
+                    </button>
                 </div>
             `).join('');
         }
@@ -459,10 +561,31 @@ class AgentDashboard {
         const input = document.getElementById('message-input');
         const content = input.value.trim();
         
-        if (!content || !this.currentAgent) {
-            if (!this.currentAgent) {
-                alert('Please select an agent first');
+        if (!content) {
+            return;
+        }
+        
+        // Check if this is an agent command (e.g., /jarvis hello)
+        const agentCommandMatch = content.match(/^\/(\w+)\s*(.*)$/);
+        if (agentCommandMatch) {
+            const agentName = agentCommandMatch[1].toLowerCase();
+            const command = agentCommandMatch[2] || 'hello';
+            
+            // Find the agent by ID
+            const targetAgent = this.agents[agentName];
+            if (targetAgent) {
+                await this.sendAgentCommand(agentName, command);
+                input.value = '';
+                return;
+            } else {
+                this.addSystemMessage(`Agent '${agentName}' not found. Available: jarvis, friday, glass, epstein, yuri`);
+                return;
             }
+        }
+        
+        // Regular message - require current agent selection
+        if (!this.currentAgent) {
+            alert('Please select an agent first or use /agentname to call an agent directly');
             return;
         }
         
@@ -482,7 +605,6 @@ class AgentDashboard {
         // Determine message type based on room
         let messageType = 'text';
         if (this.currentRoom === 'commands') messageType = 'command';
-        if (content.startsWith('/')) messageType = 'command';
         
         try {
             const message = await this.apiPost('/messages', {
@@ -498,6 +620,48 @@ class AgentDashboard {
         } catch (error) {
             console.error('Failed to send message:', error);
             this.addSystemMessage('Failed to send message');
+        }
+    }
+    
+    // Send command to invoke an agent directly (as Ferry/user)
+    async sendAgentCommand(agentId, command) {
+        try {
+            // Show "calling" message
+            this.addSystemMessage(`Calling ${this.agents[agentId]?.name || agentId}...`);
+            
+            const response = await this.apiPost('/agent-command', {
+                agentId: agentId,
+                command: command,
+                params: command,
+                userId: this.userId
+            });
+            
+            if (response.success) {
+                console.log(`Command sent to ${agentId}:`, response);
+            }
+        } catch (error) {
+            console.error('Failed to send agent command:', error);
+            this.addSystemMessage(`Failed to call agent: ${error.message}`);
+        }
+    }
+    
+    // Send direct message to specific agent (as Ferry/user)
+    async sendDirectMessage(agentId, content) {
+        if (!content.trim()) return;
+        
+        try {
+            const message = await this.apiPost('/messages', {
+                fromAgentId: this.userId,
+                toAgentId: agentId,
+                content,
+                messageType: 'direct'
+            });
+            
+            this.messages.push(message);
+            this.appendMessage(message);
+        } catch (error) {
+            console.error('Failed to send DM:', error);
+            this.addSystemMessage('Failed to send direct message');
         }
     }
     

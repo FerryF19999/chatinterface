@@ -626,6 +626,7 @@ select {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 0.75rem;
+    position: relative;
 }
 
 .toolbar-btn {
@@ -844,6 +845,112 @@ select {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--bg-hover);
+}
+
+/* Agent Command Dropdown */
+.agent-cmd-btn {
+    width: auto;
+    padding: 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    background: var(--bg-tertiary);
+}
+
+.agent-cmd-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.agent-cmd-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    min-width: 160px;
+    z-index: 100;
+}
+
+.agent-cmd-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.agent-cmd-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.agent-cmd-item:first-child {
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.agent-cmd-item:last-child {
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.agent-cmd-avatar {
+    font-size: 1.125rem;
+}
+
+.agent-cmd-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* User Messages */
+.message.user-message .message-content {
+    background: linear-gradient(135deg, var(--warning) 0%, #f59e0b 100%);
+    color: var(--bg-primary);
+}
+
+.message.user-message .message-text {
+    color: var(--bg-primary);
+}
+
+.message.user-message .message-time {
+    color: rgba(15, 23, 42, 0.7);
+}
+
+/* Command Messages */
+.message.command .message-content {
+    background: var(--info);
+    font-family: 'Courier New', monospace;
+}
+
+.message.command .message-text {
+    color: white;
+}
+
+/* DM Button */
+.dm-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.dm-item:hover .dm-btn {
+    opacity: 1;
+}
+
+.dm-btn:hover {
+    background: var(--primary-dark);
 }
 
 /* Responsive */

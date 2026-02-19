@@ -14,11 +14,22 @@ const AGENTS = [
   { id: 'epstein', name: 'Epstein', color: '#DDA0DD', avatar: '🧠', status: 'offline', lastActivity: null, currentTask: null }
 ];
 
+// User profile (Ferry)
+const USERS = {
+  ferry: { id: 'ferry', name: 'Ferry', color: '#FFD700', avatar: '👤', status: 'online', isUser: true }
+};
+
 // Initialize agent states
 let agentStates = {};
 AGENTS.forEach(agent => {
   agentStates[agent.id] = { ...agent };
 });
+
+// Helper to get sender info (agent or user)
+function getSenderInfo(senderId) {
+  if (USERS[senderId]) return USERS[senderId];
+  return agentStates[senderId];
+}
 
 let chatMessages = [];
 let activities = [];
@@ -51,9 +62,11 @@ function addMessage(fromAgentId, toAgentId, content, messageType = 'text') {
   chatMessages.push(message);
   if (chatMessages.length > 500) chatMessages.shift();
   
-  const fromAgent = agentStates[fromAgentId];
-  const targetName = toAgentId ? agentStates[toAgentId]?.name : 'everyone';
-  addActivity(fromAgentId, 'message', `Sent message to ${targetName}`, { messageId: message.id });
+  const fromSender = getSenderInfo(fromAgentId);
+  const targetName = toAgentId ? (getSenderInfo(toAgentId)?.name || toAgentId) : 'everyone';
+  const senderName = fromSender?.name || fromAgentId;
+  
+  addActivity(fromAgentId, 'message', `${senderName} sent message to ${targetName}`, { messageId: message.id });
   
   return message;
 }
@@ -73,6 +86,7 @@ app.use((req, res, next) => {
 app.get('/api/init', (req, res) => {
   res.json({
     agents: Object.values(agentStates),
+    users: USERS,
     messages: chatMessages.slice(-50),
     activities: activities.slice(-20)
   });
@@ -187,6 +201,70 @@ app.post('/api/activities', (req, res) => {
   const { agentId, type, description, metadata } = req.body;
   const activity = addActivity(agentId, type, description, metadata);
   res.status(201).json(activity);
+});
+
+// Agent command endpoint - allows users to call agents via /agentname command
+app.post('/api/agent-command', async (req, res) => {
+  const { agentId, command, params, userId = 'ferry' } = req.body;
+  
+  if (!agentId || !command) {
+    return res.status(400).json({ error: 'agentId and command are required' });
+  }
+  
+  // Validate agent exists
+  if (!agentStates[agentId]) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+  
+  const targetAgent = agentStates[agentId];
+  
+  // Add activity for the command
+  addActivity(agentId, 'command', `Received command from ${userId}: ${command}`, { 
+    fromUser: userId, 
+    params 
+  });
+  
+  // Add a message showing the command was sent
+  const commandMessage = addMessage(userId, agentId, `/${agentId} ${command} ${params || ''}`.trim(), 'command');
+  
+  // Simulate agent response (in real implementation, this would trigger the actual agent)
+  // For now, we'll add a mock response after a short delay
+  setTimeout(() => {
+    const responses = {
+      jarvis: `Hello ${userId}! I'm Jarvis, your AI assistant. How can I help you today?`,
+      friday: `Hi ${userId}! Friday here. I'm ready to assist you with any tasks.`,
+      glass: `Greetings ${userId}. Glass analyzing... What would you like me to investigate?`,
+      epstein: `Hello ${userId}. Epstein here. Ready for knowledge sharing and deep discussions.`,
+      yuri: `Hey ${userId}! Yuri reporting for duty. What mission are we on today?`
+    };
+    
+    const responseText = responses[agentId] || `Hello ${userId}! ${targetAgent.name} is ready to help.`;
+    const responseMessage = addMessage(agentId, userId, responseText, 'text');
+    
+    addActivity(agentId, 'message', `Responded to ${userId}'s command`, { 
+      command, 
+      responseId: responseMessage.id 
+    });
+  }, 1000);
+  
+  res.status(202).json({ 
+    success: true, 
+    message: `Command sent to ${targetAgent.name}`,
+    commandId: commandMessage.id
+  });
+});
+
+// Get available agents for command autocomplete
+app.get('/api/agent-commands/list', (req, res) => {
+  const commands = Object.values(agentStates).map(agent => ({
+    id: agent.id,
+    name: agent.name,
+    avatar: agent.avatar,
+    color: agent.color,
+    prefix: `/${agent.id}`
+  }));
+  
+  res.json(commands);
 });
 
 // Health check
